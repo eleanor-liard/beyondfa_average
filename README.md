@@ -38,6 +38,4 @@ sudo docker run \
     beyondfa_mix3
 sudo chmod -R 777 "$output_dir"
 ```
-# beyond_fa_microstruct_mix
-# beyond_fa_microstruct_mix
-# beyondfa_microstruct_mix
+
