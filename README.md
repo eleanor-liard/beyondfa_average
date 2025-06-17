@@ -1,4 +1,4 @@
-# Beyond FA mean of AD, MD, FA, RDAdd commentMore actions
+# Beyond FA mean of AD, MD, FA, RD
 
 
 To build this Docker container, clone the repository and run the following command in the root directory:
