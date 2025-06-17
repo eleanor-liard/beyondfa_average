@@ -3,26 +3,26 @@
 ## Diffusion Tensor Imaging Metrics
 
 **FA (Fractional Anisotropy)**
-Fractional anisotropy is a scalar value between 0 and 1 that quantifies how directional water diffusion is within a voxel in diffusion MRI, especially in white matter.
+is a scalar value between 0 and 1 that quantifies how directional water diffusion is within a voxel in diffusion MRI, especially in white matter.
 
 ```math
 FA = \sqrt{\frac{3}{2}} \cdot \frac{\sqrt{(\lambda_1 - MD)^2 + (\lambda_2 - MD)^2 + (\lambda_3 - MD)^2}}{\sqrt{\lambda_1^2 + \lambda_2^2 + \lambda_3^2}}
 ```
 **MD (Mean Diffusivity)**
-Mean diffusivity is the arithmetic mean of the three eigenvalues of the diffusion tensor.
+is the arithmetic mean of the three eigenvalues of the diffusion tensor.
 
 ```math
 MD = \frac{\lambda_1 + \lambda_2 + \lambda_3}{3}
 ```
 **AD (Axial Diffusivity)**
-Axial diffusivity captures diffusion along the primary fiber direction (largest eigenvalue), used as a marker of axonal integrity.
+captures diffusion along the primary fiber direction (largest eigenvalue), used as a marker of axonal integrity.
 
 ```math
 AD = \lambda_1
 ```
 
 **RD (Radial Diffusivity)**
-Radial diffusivity is the average of the two minor eigenvalues, associated with myelin integrity.
+is the average of the two minor eigenvalues, associated with myelin integrity.
 
 ```math
 RD = \frac{\lambda_2 + \lambda_3}{2}
