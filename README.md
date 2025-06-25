@@ -18,8 +18,8 @@ See `scripts/convert_mha_to_nifti.py` and `scripts/convert_json_to_bvalbvec.py` 
 To run this Docker:
 
 ```bash
-input_dir="/home-local/liarde/Beyond_FA/beyond_fa_microstruct_average/Inputs"            
-output_dir="/home-local/liarde/Beyond_FA/beyond_fa_microstruct_average/Outputs"                                                                                        
+input_dir="/"            
+output_dir="/"                                                                                        
 DOCKER_NOOP_VOLUME="beyondfa_mix3-volume"
 
 mkdir -p "$output_dir"
