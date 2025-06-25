@@ -3,105 +3,78 @@ set -e
 
 echo "Running BeyondFA - bundle-wise FA, MD, AD, RD + merged output..."
 
-# Paths
-dwi_mha=$(find /input/images/dwi-4d-brain-mri -name "*.mha" | head -n 1)
-json_file="/input/dwi-4d-acquisition-metadata.json"
-basename=$(basename "$dwi_mha" .mha)
-nifti_file="/tmp/${basename}.nii.gz"
-bval_file="/tmp/${basename}.bval"
-bvec_file="/tmp/${basename}.bvec"
-output_dir="/output"
-work_dir="/tmp/tractseg_work"
-mkdir -p "$work_dir"
+# Find all dwi.mha files in /input
+dwi_mha_files=$(find /input/images/dwi-4d-brain-mri -name "*.mha")
 
-echo "Converting input files..."
-python convert_mha_to_nifti.py "$dwi_mha" "$nifti_file"
-python convert_json_to_bvalbvec.py "$json_file" "$bval_file" "$bvec_file"
+for dwi_mha_file in $dwi_mha_files; do
+    # Set up file names
+    json_file="/input/dwi-4d-acquisition-metadata.json"
 
-echo "Preprocessing (mask + response)..."
-mask="$work_dir/mask.nii.gz"
-response="$work_dir/response.txt"
-dwi2mask "$nifti_file" "$mask" -fslgrad "$bvec_file" "$bval_file" -force
-dwi2response fa "$nifti_file" "$response" -fslgrad "$bvec_file" "$bval_file" -force
+    basename=$(basename "$dwi_mha_file" .mha)
+    bval_file="/tmp/${basename}.bval"
+    bvec_file="/tmp/${basename}.bvec"
+    nifti_file="/tmp/${basename}.nii.gz"
+    bval_path=$bval_file
+    bvec_path=$bvec_file
 
-echo "Computing FODs and peaks..."
-fod="$work_dir/WM_FODs.nii.gz"
-peaks="$work_dir/peaks.nii.gz"
-dwi2fod csd "$nifti_file" "$response" "$fod" -mask "$mask" -fslgrad "$bvec_file" "$bval_file" -force
-sh2peaks "$fod" "$peaks" -mask "$mask" -force
+    # Convert dwi.mha to nii.gz
+    echo "Converting $dwi_mha_file to $nifti_file..."
+    python convert_mha_to_nifti.py $dwi_mha_file $nifti_file
 
-echo "Segmenting bundles using TractSeg..."
-TractSeg -i "$peaks" -o "$work_dir" --bvals "$bval_file" --bvecs "$bvec_file" --brain_mask "$mask" --keep_intermediate_files
+    # Convert json to bval and bvec
+    echo "Converting $json_file to $bval_path and $bvec_path..."
+    python convert_json_to_bvalbvec.py $json_file $bval_path $bvec_path
 
-echo "Computing DTI metrics: FA, MD, AD, RD..."
-metric_dir="$work_dir/metrics"
-mkdir -p "$metric_dir"
-scil_dti_metrics.py --mask "$mask" \
-    --fa "$metric_dir/fa.nii.gz" \
-    --md "$metric_dir/md.nii.gz" \
-    --ad "$metric_dir/ad.nii.gz" \
-    --rd "$metric_dir/rd.nii.gz" \
-    "$nifti_file" "$bval_file" "$bvec_file" -f
+    # Define output directory
+    output_dir="/output"
+    work_dir="/tmp/tractseg_work"
+    mkdir -p "$work_dir"
 
-echo "DTI metrics generated:"
-ls -lh "$metric_dir"
+    # Create mask, response, FODs, and peaks
+    echo "Preprocessing (mask + response)"
+    mask="$work_dir/mask.nii.gz"
+    response="$work_dir/response.txt"
+    dwi2mask "$nifti_file" "$mask" -fslgrad "$bvec_file" "$bval_file" -force
+    dwi2response fa "$nifti_file" "$response" -fslgrad "$bvec_file" "$bval_file" -force
 
-bundle_dir="$work_dir/bundle_segmentations"
-bundle_list=$(find "$bundle_dir" -name "*.nii.gz" | sort)
+    echo "Computing FODs and peaks"
+    fod="$work_dir/WM_FODs.nii.gz"
+    peaks="$work_dir/peaks.nii.gz"
+    dwi2fod csd "$nifti_file" "$response" "$fod" -mask "$mask" -fslgrad "$bvec_file" "$bval_file" -force
+    sh2peaks "$fod" "$peaks" -mask "$mask" -force
 
-# Init average list only
-avg_list=()
+    # Run TractSeg
+    echo "Segmenting bundles using TractSeg"
+    TractSeg -i "$peaks" -o "$work_dir" --bvals "$bval_file" --bvecs "$bvec_file" --brain_mask "$mask" --keep_intermediate_files
 
-echo "Computing mean values per bundle..."
-for roi in $bundle_list; do
-    name=$(basename "$roi" .nii.gz)
-    voxels=$(fslstats "$roi" -V | awk '{print $1}')
-    if [ "$voxels" -eq 0 ]; then
-        fa=0; md=0; ad=0; rd=0
-    else
-        fa=$(fslstats "$metric_dir/fa.nii.gz" -k "$roi" -m)
-        md=$(fslstats "$metric_dir/md.nii.gz" -k "$roi" -m)
-        ad=$(fslstats "$metric_dir/ad.nii.gz" -k "$roi" -m)
-        rd=$(fslstats "$metric_dir/rd.nii.gz" -k "$roi" -m)
-    fi
+    # Run FA, MD, AD and RD calculation
+    echo "Computing DTI metrics: FA, MD, AD, RD"
+    metric_dir="$work_dir/metrics"
+    
+    mkdir -p "$metric_dir"
+    scil_dti_metrics.py --mask "$mask" \
+        --fa "$metric_dir/fa.nii.gz" \
+        --md "$metric_dir/md.nii.gz" \
+        --ad "$metric_dir/ad.nii.gz" \
+        --rd "$metric_dir/rd.nii.gz" \
+        "$nifti_file" "$bval_file" "$bvec_file" -f
 
-    # Format
-    fa=$(printf "%.6f" "$fa" | sed 's/^\./0./')
-    md=$(printf "%.6f" "$md" | sed 's/^\./0./')
-    ad=$(printf "%.6f" "$ad" | sed 's/^\./0./')
-    rd=$(printf "%.6f" "$rd" | sed 's/^\./0./')
-    mean_bundle=$(echo "scale=8; ($fa + $md + $ad + $rd) / 4" | bc -l)
-    mean_bundle=$(printf "%.6f" "$mean_bundle" | sed 's/^\./0./')
+    echo "DTI metrics generated:"
+    ls -lh "$metric_dir"
 
-    echo "$name: AVG=$mean_bundle"
-    avg_list+=("$mean_bundle")
+    # Compute average of calculation per bundle
+
+    roi_list=$(find "$work_dir/bundle_segmentations" -name "*.nii.gz" | sort)
+
+    echo "Computing mean values per bundle"
+
+    for metric in fa md ad rd; do
+        scil_volume_stats_in_ROI.py \
+            --metrics "$metric_dir/${metric}.nii.gz" \
+            --bin \
+            $roi_list
+    done
+
+    echo "Done. Output file:"
+    echo "  - $output_dir/features-128.json"
 done
-
-# Pad to 128
-while [ "${#avg_list[@]}" -lt 128 ]; do
-    avg_list+=(0)
-done
-
-# Write only final features file
-write_json() {
-    arr=("$@")
-    file="${arr[-1]}"
-    unset 'arr[${#arr[@]}-1]'
-    {
-        echo "["
-        for i in "${!arr[@]}"; do
-            if [ "$i" -lt $((${#arr[@]} - 1)) ]; then
-                echo "  ${arr[$i]},"
-            else
-                echo "  ${arr[$i]}"
-            fi
-        done
-        echo "]"
-    } > "$file"
-}
-
-echo "Saving features file to $output_dir/features-128.json"
-write_json "${avg_list[@]}" "$output_dir/features-128.json"
-
-echo "Done. Output file:"
-echo "  - $output_dir/features-128.json"

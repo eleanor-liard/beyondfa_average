@@ -8,9 +8,9 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 RUN echo 'export PATH="/opt/fsl/bin:/opt/mrtrix3/bin:$PATH"' >> /etc/profile.d/path.sh \
 && chmod +x /etc/profile.d/path.sh
 
-# Install scilpy & tractseg dependencies + bc
+# Install scilpy & tractseg dependencies
 RUN apt-get update && apt-get install -y \
-    git wget build-essential libblas-dev liblapack-dev bc \
+    git wget build-essential libblas-dev liblapack-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 ENV SETUPTOOLS_USE_DISTUTILS=stdlib
 
